@@ -1,0 +1,122 @@
+---
+- name: Install ADCS
+  ansible.windows.win_feature:
+    name: AD-Certificate
+    state: present
+    include_sub_features: true
+    include_management_tools: true
+
+- name: Install-WindowsFeature ADCS-Cert-Authority
+  ansible.windows.win_feature:
+    name: ADCS-Cert-Authority
+    state: present
+    include_management_tools: true
+
+- name: Install-WindowsFeature ADCS-Web-Enrollment
+  ansible.windows.win_feature:
+    name: ADCS-Web-Enrollment
+    state: present
+  when: ludus_adcs_esc8
+
+- name: Install-ADCSCertificationAuthority-PS
+  ansible.windows.win_powershell:
+    script: |
+      [CmdletBinding()]
+      param (
+          [String]
+          $domain_username,
+
+          [String]
+          $domain_password,
+
+          [String]
+          $ca_common_name
+      )
+      $pass = ConvertTo-SecureString $domain_password -AsPlainText -Force
+      $Cred = New-Object System.Management.Automation.PSCredential ($domain_username, $pass)
+      try {
+        Install-AdcsCertificationAuthority -Credential $Cred -CAType EnterpriseRootCA -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" -KeyLength 2048 -HashAlgorithmName SHA256 -ValidityPeriod Years -ValidityPeriodUnits 5 -CACommonName $ca_common_name -Force
+        $Ansible.Changed = $true
+      } catch {
+        $Ansible.Changed = $false
+      }
+    error_action: stop
+    parameters:
+      domain_username: "{{ ludus_adcs_domain_username }}"
+      domain_password: "{{ ludus_adcs_domain_password }}"
+      ca_common_name: "{{ ludus_adcs_ca_common_name }}"
+
+- name: Enable Web enrollement
+  ansible.windows.win_powershell:
+    script: |
+      [CmdletBinding()]
+      param ()
+      try {
+        Install-AdcsWebEnrollment -Force
+        $Ansible.Changed = $true
+      } catch {
+        $Ansible.Changed = $false
+      }
+  when: ludus_adcs_esc8
+
+- name: Install ADCSTemplate Module
+  win_copy:
+    src: files/ADCSTemplate
+    dest: "C:\\Program Files\\WindowsPowerShell\\Modules"
+
+- name: Create a directory for templates
+  ansible.windows.win_file:
+    path: c:\ludus\adcs
+    state: directory
+
+- name: Copy templates json
+  ansible.windows.win_copy:
+    src: "files/{{ adcs_template_name }}.json"
+    dest: "C:\\ludus\\adcs\\{{ adcs_template_name }}.json"
+  loop:
+    - ESC1
+    - ESC2
+    - ESC3
+    - ESC3_CRA
+    - ESC4
+  loop_control:
+    loop_var: adcs_template_name
+
+- name: Convert vars to dictionary and filter true values
+  ansible.builtin.set_fact:
+    escs_to_enable: "{{ dict(
+      esc1=ludus_adcs_esc1,
+      esc2=ludus_adcs_esc2,
+      esc3=ludus_adcs_esc3,
+      esc3_cra=ludus_adcs_esc3_cra,
+      esc4=ludus_adcs_esc4,
+    ) | dict2items | selectattr('value', 'equalto', true) | map(attribute='key') | list }}"
+
+
+- name: Install templates
+  ansible.windows.win_shell: |
+    if (-not(Get-ADCSTemplate -DisplayName "{{ adcs_template_name }}")) { New-ADCSTemplate -DisplayName "{{ adcs_template_name }}" -JSON (Get-Content c:\ludus\adcs\{{ adcs_template_name }}.json -Raw) -Identity "{{ domain_name }}\Domain Users" -Publish }
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    domain_name: "{{ ludus_adcs_domain }}"
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+  loop: "{{ escs_to_enable | upper }}"
+  loop_control:
+    loop_var: adcs_template_name
+
+- name: "Configure ATTRIBUTESUBJECTALTNAME2 on CA - ESC6"
+  ansible.windows.win_shell: |
+    certutil -config "{{ cauthority_server }}\{{ cauthority_common_name }}" -setreg policy\Editflags +EDITF_ATTRIBUTESUBJECTALTNAME2
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+    cauthority_server: "{{ ludus_adcs_ca_host }}"
+    cauthority_common_name: "{{ ludus_adcs_ca_common_name }}"
+  when: ludus_adcs_esc6 is true
+
+- name: Refresh
+  ansible.windows.win_command: gpupdate /force

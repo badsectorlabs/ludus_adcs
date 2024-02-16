@@ -1,0 +1,15 @@
+---
+# This pulls the netbios_name out of the domain assigned to this machine in the ludus range config
+ludus_adcs_domain: "{{ (ludus | selectattr('vm_name', 'match', inventory_hostname))[0].domain.fqdn.split('.')[0] }}"
+# This pulls the hostname from the ludus config for this host
+ludus_adcs_ca_host: "{{ (ludus | selectattr('vm_name', 'match', inventory_hostname))[0].hostname }}"
+ludus_adcs_domain_username: "{{ ludus_adcs_domain }}\\{{ defaults.ad_domain_admin }}"
+ludus_adcs_domain_password: "{{ defaults.ad_domain_admin_password }}"
+ludus_adcs_ca_common_name: "{{ ludus_adcs_domain }}-CA"
+ludus_adcs_esc1: true
+ludus_adcs_esc2: true
+ludus_adcs_esc3: true
+ludus_adcs_esc3_cra: true
+ludus_adcs_esc4: true
+ludus_adcs_esc6: true
+ludus_adcs_esc8: true
