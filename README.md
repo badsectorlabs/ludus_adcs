@@ -34,7 +34,7 @@ None.
 ```yaml
 - hosts: adcs_hosts
   roles:
-    - bad-sector-labs.ludus_adcs
+    - badsectorlabs.ludus_adcs
   vars:
     ludus_adcs_domain: mydomain
     ludus_adcs_ca_host: CAHOST
@@ -68,7 +68,7 @@ ludus:
       fqdn: ludus.domain
       role: primary-dc
     roles:
-      - bad-sector-labs.ludus_adcs
+      - badsectorlabs.ludus_adcs
     role_vars:
       ludus_adcs_esc6: false
 ```
