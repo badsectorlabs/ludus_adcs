@@ -6,6 +6,11 @@
     include_sub_features: true
     include_management_tools: true
 
+- name: Import the ADCSAdministration module
+  community.windows.win_psmodule:
+    name: ADCSAdministration
+    state: present
+
 - name: Install-WindowsFeature ADCS-Cert-Authority
   ansible.windows.win_feature:
     name: ADCS-Cert-Authority
@@ -46,7 +51,7 @@
       domain_password: "{{ ludus_adcs_domain_password }}"
       ca_common_name: "{{ ludus_adcs_ca_common_name }}"
 
-- name: Enable Web enrollement
+- name: Enable Web enrollment
   ansible.windows.win_powershell:
     script: |
       [CmdletBinding()]
@@ -59,10 +64,22 @@
       }
   when: ludus_adcs_esc8
 
-- name: Install ADCSTemplate Module
+- name: Copy the ADCSTemplate Module to CA
   win_copy:
     src: files/ADCSTemplate
     dest: "C:\\Program Files\\WindowsPowerShell\\Modules"
+
+- name: Install Active Directory Windows Features (needed for ADCSTemplate module)
+  win_feature:
+      name: RSAT-AD-Tools
+      include_management_tools: yes
+      include_sub_features: yes
+      state: present
+
+- name: Import the ADCSTemplate Module
+  community.windows.win_psmodule:
+    name: ADCSTemplate
+    state: present
 
 - name: Create a directory for templates
   ansible.windows.win_file:
@@ -79,6 +96,7 @@
     - ESC3
     - ESC3_CRA
     - ESC4
+    - ESC13
   loop_control:
     loop_var: adcs_template_name
 
@@ -90,8 +108,8 @@
       esc3=ludus_adcs_esc3,
       esc3_cra=ludus_adcs_esc3_cra,
       esc4=ludus_adcs_esc4,
+      esc13=ludus_adcs_esc13,
     ) | dict2items | selectattr('value', 'equalto', true) | map(attribute='key') | list }}"
-
 
 - name: Install templates
   ansible.windows.win_shell: |
@@ -117,6 +135,10 @@
     cauthority_server: "{{ ludus_adcs_ca_host }}"
     cauthority_common_name: "{{ ludus_adcs_ca_common_name }}"
   when: ludus_adcs_esc6 is true
+
+- name: Set up ESC13
+  include_tasks: esc13.yml
+  when: ludus_adcs_esc13 is true
 
 - name: Refresh
   ansible.windows.win_command: gpupdate /force
