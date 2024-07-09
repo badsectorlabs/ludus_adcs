@@ -136,6 +136,10 @@
     cauthority_common_name: "{{ ludus_adcs_ca_common_name }}"
   when: ludus_adcs_esc6 is true
 
+- name: Set up ESC4
+  include_tasks: esc4.yml
+  when: ludus_adcs_esc4 is true
+
 - name: Set up ESC13
   include_tasks: esc13.yml
   when: ludus_adcs_esc13 is true
