@@ -1,0 +1,197 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>6CAFC0C6-A428-4d30-A9F9-700E829FEA51</ProjectGuid>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>MyApplication</RootNamespace>
+    <AssemblyName>MyApplication</AssemblyName>
+    <Name>PSPKI</Name>
+    <Author>Vadims Podans</Author>
+    <CompanyName>Sysadmins LV</CompanyName>
+    <Copyright>All rights reserved</Copyright>
+    <Description />
+    <Version>3.2.5.0</Version>
+    <Guid>08a70230-ae58-48af-ae73-e4276b6ef1eb</Guid>
+    <PackageEntryPoint>Client\Add-AdCertificate.ps1</PackageEntryPoint>
+    <DotNetVersion>v4.7.1</DotNetVersion>
+    <PackageType>Console</PackageType>
+    <PostBuildScript>$exclude = "bin", "obj", "PSPKI.pssproj", "PSPKI.tests.ps1"
+$source = '$(SolutionDir)' + "PSPKI"
+$target = "C:\Users\vPodans\Documents\WindowsPowerShell\Modules\PSPKI"
+del $target -Recurse -ea 0
+md $target -force
+$folders = dir -Path $source -directory | ?{$exclude -notcontains $_.Name} | %{copy $source\$_ -Destination $target\$_ -rec -Force}
+dir $source -file | copy-item -dest ($target + "\") -exclude $exclude -force</PostBuildScript>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="about_PSPKI_Module.help.txt" />
+    <Content Include="about_ReleaseNotes.txt" />
+    <Content Include="Client\PSPKI.Help.xml" />
+    <Content Include="Library\Interop.CERTADMINLib.dll" />
+    <Content Include="Library\Interop.CERTCLILib.dll" />
+    <Content Include="Library\Interop.CERTENROLLLib.dll" />
+    <Content Include="Library\SysadminsLV.Asn1Parser.dll" />
+    <Content Include="Library\SysadminsLV.PKI.dll" />
+    <Content Include="Library\SysadminsLV.PKI.OcspClient.dll" />
+    <Content Include="Library\SysadminsLV.PKI.OcspClient.pdb" />
+    <Content Include="Library\SysadminsLV.PKI.Win.dll" />
+    <Content Include="Library\SysadminsLV.PKI.Win.pdb" />
+    <Content Include="Library\System.Security.Cryptography.Pkcs.dll" />
+    <Content Include="Server\PSPKI.Help.xml" />
+    <Content Include="Types\PSPKI.Format.ps1xml" />
+    <Content Include="Types\PSPKI.PS5Types.ps1xml" />
+    <Content Include="Types\PSPKI.Types.ps1xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Client\Add-AdCertificate.ps1" />
+    <Compile Include="Client\Add-AdCertificateRevocationList.ps1" />
+    <Compile Include="Client\Convert-PemToPfx.ps1" />
+    <Compile Include="Client\Convert-PfxToPem.ps1" />
+    <Compile Include="Client\Remove-CertificatePrivateKey.ps1" />
+    <Compile Include="Client\Get-AdPkiContainer.ps1" />
+    <Compile Include="Client\Get-CertificateContextProperty.ps1" />
+    <Compile Include="Client\Get-CertificateRequest.ps1" />
+    <Compile Include="Client\Get-CertificateRevocationList.ps1" />
+    <Compile Include="Client\Get-CertificateTrustList.ps1" />
+    <Compile Include="Client\Get-CryptographicServiceProvider.ps1" />
+    <Compile Include="Client\Get-EnrollmentPolicyServerClient.ps1" />
+    <Compile Include="Client\Get-ErrorMessage.ps1" />
+    <Compile Include="Client\Get-ObjectIdentifier.ps1" />
+    <Compile Include="Client\Get-ObjectIdentifierEx.ps1" />
+    <Compile Include="Client\Install-CertificateResponse.ps1" />
+    <Compile Include="Client\New-SelfSignedCertificateEx.ps1" />
+    <Compile Include="Client\Ping-ICertInterface.ps1" />
+    <Compile Include="Client\Receive-Certificate.ps1" />
+    <Compile Include="Client\Register-ObjectIdentifier.ps1" />
+    <Compile Include="Client\Remove-AdCertificate.ps1" />
+    <Compile Include="Client\Remove-AdCertificateRevocationList.ps1" />
+    <Compile Include="Client\Show-Certificate.ps1" />
+    <Compile Include="Client\Show-CertificateRevocationList.ps1" />
+    <Compile Include="Client\Show-CertificateTrustList.ps1" />
+    <Compile Include="Client\Submit-CertificateRequest.ps1" />
+    <Compile Include="Client\Test-WebServerSSL.ps1" />
+    <Compile Include="Client\Unregister-ObjectIdentifier.ps1" />
+    <Compile Include="PSPKI.psd1" />
+    <Compile Include="PSPKI.psm1" />
+    <Compile Include="PSPKI.tests.ps1" />
+    <Compile Include="Server\Add-AuthorityInformationAccess.ps1" />
+    <Compile Include="Server\Add-CertificationAuthorityAcl.ps1" />
+    <Compile Include="Server\Add-CAKRACertificate.ps1" />
+    <Compile Include="Server\Add-CATemplate.ps1" />
+    <Compile Include="Server\Add-CertificateTemplateAcl.ps1" />
+    <Compile Include="Server\Add-CRLDistributionPoint.ps1" />
+    <Compile Include="Server\Add-ExtensionList.ps1" />
+    <Compile Include="Server\Add-OnlineResponderAcl.ps1" />
+    <Compile Include="Server\Add-OnlineResponderArrayMember.ps1" />
+    <Compile Include="Server\Add-OnlineResponderLocalCrlEntry.ps1" />
+    <Compile Include="Server\Add-OnlineResponderRevocationConfiguration.ps1" />
+    <Compile Include="Server\Approve-CertificateRequest.ps1" />
+    <Compile Include="Server\Connect-CertificationAuthority.ps1" />
+    <Compile Include="Server\Connect-OnlineResponder.ps1" />
+    <Compile Include="Server\Deny-CertificateRequest.ps1" />
+    <Compile Include="Server\Disable-CertificateRevocationListFlag.ps1" />
+    <Compile Include="Server\Disable-InterFaceFlag.ps1" />
+    <Compile Include="Server\Disable-KeyRecoveryAgentFlag.ps1" />
+    <Compile Include="Server\Disable-PolicyModuleFlag.ps1" />
+    <Compile Include="Server\Enable-CertificateRevocationListFlag.ps1" />
+    <Compile Include="Server\Enable-InterfaceFlag.ps1" />
+    <Compile Include="Server\Enable-KeyRecoveryAgentFlag.ps1" />
+    <Compile Include="Server\Enable-PolicyModuleFlag.ps1" />
+    <Compile Include="Server\Get-ADKRACertificate.ps1" />
+    <Compile Include="Server\Get-AuthorityInformationAccess.ps1" />
+    <Compile Include="Server\Get-CACryptographyConfig.ps1" />
+    <Compile Include="Server\Get-CAExchangeCertificate.ps1" />
+    <Compile Include="Server\Get-CAKRACertificate.ps1" />
+    <Compile Include="Server\Get-CertificationAuthorityDbSchema.ps1" />
+    <Compile Include="Server\Get-CertificationAuthorityAcl.ps1" />
+    <Compile Include="Server\Get-CATemplate.ps1" />
+    <Compile Include="Server\Get-CertificateRevocationListFlag.ps1" />
+    <Compile Include="Server\Get-CertificateTemplate.ps1" />
+    <Compile Include="Server\Get-CertificateTemplateAcl.ps1" />
+    <Compile Include="Server\Get-CertificateValidityPeriod.ps1" />
+    <Compile Include="Server\Get-CertificationAuthority.ps1" />
+    <Compile Include="Server\Get-CRLDistributionPoint.ps1" />
+    <Compile Include="Server\Get-CRLValidityPeriod.ps1" />
+    <Compile Include="Server\Get-AdcsDatabaseRow.ps1" />
+    <Compile Include="Server\Get-EnterprisePKIHealthStatus.ps1" />
+    <Compile Include="Server\Get-ExtensionList.ps1" />
+    <Compile Include="Server\Get-FailedRequest.ps1" />
+    <Compile Include="Server\Get-InterfaceFlag.ps1" />
+    <Compile Include="Server\Get-IssuedRequest.ps1" />
+    <Compile Include="Server\Get-KeyRecoveryAgentFlag.ps1" />
+    <Compile Include="Server\Get-OnlineResponderAcl.ps1" />
+    <Compile Include="Server\Get-PendingRequest.ps1" />
+    <Compile Include="Server\Get-PolicyModuleFlag.ps1" />
+    <Compile Include="Server\Get-RequestArchivedKey.ps1" />
+    <Compile Include="Server\Get-RequestRow.ps1" />
+    <Compile Include="Server\Get-RevokedRequest.ps1" />
+    <Compile Include="Server\Import-LostCertificate.ps1" />
+    <Compile Include="Server\Publish-CRL.ps1" />
+    <Compile Include="Server\Remove-AdcsDatabaseRow.ps1" />
+    <Compile Include="Server\Remove-AuthorityInformationAccess.ps1" />
+    <Compile Include="Server\Remove-CertificationAuthorityAcl.ps1" />
+    <Compile Include="Server\Remove-CAKRACertificate.ps1" />
+    <Compile Include="Server\Remove-CATemplate.ps1" />
+    <Compile Include="Server\Remove-CertificateTemplate.ps1" />
+    <Compile Include="Server\Remove-CertificateTemplateAcl.ps1" />
+    <Compile Include="Server\Remove-CRLDistributionPoint.ps1" />
+    <Compile Include="Server\Remove-ExtensionList.ps1" />
+    <Compile Include="Server\Remove-OnlineResponderAcl.ps1" />
+    <Compile Include="Server\Remove-OnlineResponderArrayMember.ps1" />
+    <Compile Include="Server\Remove-OnlineResponderLocalCrlEntry.ps1" />
+    <Compile Include="Server\Restart-CertificationAuthority.ps1" />
+    <Compile Include="Server\Restart-OnlineResponder.ps1" />
+    <Compile Include="Server\Restore-CertificateRevocationListFlagDefault.ps1" />
+    <Compile Include="Server\Restore-InteraceFlagDefault.ps1" />
+    <Compile Include="Server\Restore-KeyRecoveryAgentFlagDefault.ps1" />
+    <Compile Include="Server\Restore-PolicyModuleFlagDefault.ps1" />
+    <Compile Include="Server\Revoke-Certificate.ps1" />
+    <Compile Include="Server\Get-OnlineResponderRevocationConfiguration.ps1" />
+    <Compile Include="Server\Remove-OnlineResponderRevocationConfiguration.ps1" />
+    <Compile Include="Server\Set-AuthorityInformationAccess.ps1" />
+    <Compile Include="Server\Set-CACryptographyConfig.ps1" />
+    <Compile Include="Server\Set-CAKRACertificate.ps1" />
+    <Compile Include="Server\Set-CertificationAuthorityAcl.ps1" />
+    <Compile Include="Server\Set-CATemplate.ps1" />
+    <Compile Include="Server\Set-CertificateExtension.ps1" />
+    <Compile Include="Server\Set-CertificateTemplateAcl.ps1" />
+    <Compile Include="Server\Set-CertificateValidityPeriod.ps1" />
+    <Compile Include="Server\Set-CRLDistributionPoint.ps1" />
+    <Compile Include="Server\Set-CRLValidityPeriod.ps1" />
+    <Compile Include="Server\Set-ExtensionList.ps1" />
+    <Compile Include="Server\Set-OnlineResponderAcl.ps1" />
+    <Compile Include="Server\Set-OnlineResponderProperty.ps1" />
+    <Compile Include="Server\Set-OnlineResponderRevocationConfiguration.ps1" />
+    <Compile Include="Server\Start-CertificationAuthority.ps1" />
+    <Compile Include="Server\Start-OnlineResponder.ps1" />
+    <Compile Include="Server\Stop-CertificationAuthority.ps1" />
+    <Compile Include="Server\Stop-OnlineResponder.ps1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Client\" />
+    <Folder Include="Library\" />
+    <Folder Include="Types\" />
+    <Folder Include="Server\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Target Name="Build" />
+</Project>
