@@ -1,0 +1,41 @@
+---
+- name: Display Primary DC and CA host
+  ansible.builtin.debug:
+    msg: "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
+
+- name: Create an ESC5 domain user
+  community.windows.win_domain_user:
+    name: "{{ ludus_adcs_esc5_user }}"
+    password: "{{ ludus_adcs_esc5_password }}"
+    upn: "{{ ludus_adcs_esc5_user }}"
+    password_never_expires: true
+    user_cannot_change_password: true
+    state: present
+    domain_username: "{{ ludus_adcs_domain_username }}"
+    domain_password: "{{ ludus_adcs_domain_password }}"
+    domain_server: "{{ ludus_adcs_dc }}"
+
+- name: Check if user is already in the Administrators group
+  ansible.windows.win_shell: |
+    (net localgroup Administrators | Select-String -Pattern '{{ ludus_adcs_esc5_user }}') -ne $null
+  register: user_is_admin
+  args:
+    executable: powershell
+
+- name: Add ESC5 user to local administrators group
+  ansible.windows.win_shell: |
+    net localgroup administrators /add '{{ ludus_adcs_esc5_user }}'
+  become: true
+  become_method: runas
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    domain_name: "{{ ludus_adcs_domain }}"
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+  when: user_is_admin.stdout == "False\r\n"
+  register: esc5_output
+
+- name: Output ESC5 script result
+  ansible.builtin.debug:
+    var: esc5_output
