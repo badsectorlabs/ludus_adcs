@@ -29,6 +29,11 @@
     src: files/esc13.ps1
     dest: C:\ludus\adcs\esc13.ps1
 
+- name: Copy ESC13 ACLs script to remote host
+  ansible.windows.win_copy:
+    src: files/esc13_acls.ps1
+    dest: C:\ludus\adcs\esc13_acls.ps1
+
 - name: Run ESC13 script
   ansible.windows.win_shell: |
     C:\ludus\adcs\esc13.ps1 -esc13group '{{ ludus_adcs_esc13_group }}' -esc13templateName '{{ ludus_adcs_esc13_template }}' -esc13user '{{ ludus_adcs_esc13_user }}'
@@ -46,8 +51,19 @@
   ansible.builtin.debug:
     var: esc13_output
 
-- name: Give the ESC13 group something juicy for the operator to abuse it
-  win_shell: |
-    whoami
-  args:
-    executable: powershell.exe
+- name: Run ESC13 ACLs script, AKA "Give the ESC13 group something juicy for the operator to abuse it"
+  ansible.windows.win_shell: |
+    C:\ludus\adcs\esc13_acls.ps1 -esc13group '{{ ludus_adcs_esc13_group }}' | Select-String -Pattern '{{ ludus_adcs_esc13_group }}'
+  become: true
+  become_method: runas
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    domain_name: "{{ ludus_adcs_domain }}"
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+  register: esc13_acls_output
+
+- name: Output ESC13 ACLs script result
+  ansible.builtin.debug:
+    var: esc13_acls_output

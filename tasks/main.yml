@@ -96,6 +96,8 @@
     - ESC3
     - ESC3_CRA
     - ESC4
+    - ESC7_CertMgr
+    - ESC9
     - ESC13
   loop_control:
     loop_var: adcs_template_name
@@ -108,6 +110,8 @@
       esc3=ludus_adcs_esc3,
       esc3_cra=ludus_adcs_esc3_cra,
       esc4=ludus_adcs_esc4,
+      esc7_certmgr=ludus_adcs_esc7,
+      esc9=ludus_adcs_esc9,
       esc13=ludus_adcs_esc13,
     ) | dict2items | selectattr('value', 'equalto', true) | map(attribute='key') | list }}"
 
@@ -140,9 +144,29 @@
   include_tasks: esc4.yml
   when: ludus_adcs_esc4 is true
 
+- name: Set up ESC5
+  include_tasks: esc5.yml
+  when: ludus_adcs_esc5 is true
+
+- name: Set up ESC7
+  include_tasks: esc7.yml
+  when: ludus_adcs_esc7 is true
+
+- name: Set up ESC9
+  include_tasks: esc9.yml
+  when: ludus_adcs_esc9 is true
+
+- name: Set up ESC11
+  include_tasks: esc11.yml
+  when: ludus_adcs_esc11 is true
+
 - name: Set up ESC13
   include_tasks: esc13.yml
   when: ludus_adcs_esc13 is true
+
+- name: Set up ESC15
+  include_tasks: esc15.yml
+  when: ludus_adcs_esc15 is true
 
 - name: Refresh
   ansible.windows.win_command: gpupdate /force

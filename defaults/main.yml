@@ -13,11 +13,27 @@ ludus_adcs_esc2: true
 ludus_adcs_esc3: true
 ludus_adcs_esc3_cra: true
 ludus_adcs_esc4: true
+ludus_adcs_esc5: true
 ludus_adcs_esc6: true
+ludus_adcs_esc7: true
 ludus_adcs_esc8: true
+ludus_adcs_esc9: true
+ludus_adcs_esc11: true
 ludus_adcs_esc13: true
+ludus_adcs_esc15: true
 
 # Vars for specific ESCs
+ludus_adcs_esc5_user: esc5user
+ludus_adcs_esc5_password: ESC5password
+
+ludus_adcs_esc7_ca_manager_user: esc7_camgr_user
+ludus_adcs_esc7_ca_manager_password: ESC7password
+ludus_adcs_esc7_cert_manager_user: esc7_certmgr_user
+ludus_adcs_esc7_cert_manager_password: ESC7password
+
+ludus_adcs_esc9_user: esc9user
+ludus_adcs_esc9_password: ESC9password
+
 ludus_adcs_esc13_user: esc13user
 ludus_adcs_esc13_password: ESC13password
 ludus_adcs_esc13_group: esc13group
