@@ -12,6 +12,8 @@ An Ansible Role that installs [ADCS](https://learn.microsoft.com/en-us/windows-s
 - Optionally, configures IF_ENFORCEENCRYPTICERTREQUEST on CA for ESC11
 - Optionally, for ESC13, creates a user (`esc13user`), group (`esc13group`), template (`ESC13`), and Issuance policy (`IssuancePolicyForESC13`)
 - Optionally, makes the `WebServer` template vulnerable to ESC15
+- Optionally, configures szOID_NTDS_CA_SECURITY_EXT on CA and creates a user (`esc16user`) with inbound GenericAll rights for ESC16
+
 
 > [!WARNING]
 > This role is not idempotent! Setting a `ludus_adcs_escX` value to `true`, applying the role, then setting it to `false` and applying the role will *NOT* remove the template that is now set to `false`.
@@ -46,6 +48,7 @@ Available variables are listed below, along with default values (see `defaults/m
     ludus_adcs_esc11: true
     ludus_adcs_esc13: true
     ludus_adcs_esc15: true
+    ludus_adcs_esc16: true
 
     # Vars for specific ESCs
     ludus_adcs_esc5_user: esc5user
@@ -63,6 +66,9 @@ Available variables are listed below, along with default values (see `defaults/m
     ludus_adcs_esc13_password: ESC13password
     ludus_adcs_esc13_group: esc13group
     ludus_adcs_esc13_template: ESC13
+
+    ludus_adcs_esc16_user: esc16user
+    ludus_adcs_esc16_password: ESC16password
 
 ## Dependencies
 
@@ -94,6 +100,7 @@ None.
     ludus_adcs_esc11: true
     ludus_adcs_esc13: true
     ludus_adcs_esc15: true
+    ludus_adcs_esc16: true
 ```
 
 ## Example Ludus Range Config
@@ -115,7 +122,7 @@ ludus:
     roles:
       - badsectorlabs.ludus_adcs
     role_vars:
-      ludus_adcs_esc6: false # By default ESC1,2,3,4,5,6,7,8,9,11,13, and 15 are enabled
+      ludus_adcs_esc6: false # By default ESC1,2,3,4,5,6,7,8,9,11,13,15, and 16 are enabled
 ```
 
 ## License
@@ -132,4 +139,4 @@ The inlcuded [PSPKI](https://github.com/PKISolutions/PSPKI/) project is licensed
 
 This role was created in 2024 by [Bad Sector Labs](https://badsectorlabs.com/), for [Ludus](https://ludus.cloud/).
 
-Support for ESC5, ESC7, ESC9, ESC11, and ESC15 was added in November 2024 by [Brady McLaughlin](https://github.com/bradyjmcl).
+Support for ESC5, ESC7, ESC9, ESC11, and ESC15 was added in November 2024, and ESC16 in May 2025 by [Brady McLaughlin](https://github.com/bradyjmcl).
