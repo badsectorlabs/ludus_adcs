@@ -21,6 +21,7 @@ ludus_adcs_esc9: true
 ludus_adcs_esc11: true
 ludus_adcs_esc13: true
 ludus_adcs_esc15: true
+ludus_adcs_esc16: true
 
 # Vars for specific ESCs
 ludus_adcs_esc5_user: esc5user
@@ -38,3 +39,6 @@ ludus_adcs_esc13_user: esc13user
 ludus_adcs_esc13_password: ESC13password
 ludus_adcs_esc13_group: esc13group
 ludus_adcs_esc13_template: ESC13
+
+ludus_adcs_esc16_user: esc16user
+ludus_adcs_esc16_password: ESC16password
