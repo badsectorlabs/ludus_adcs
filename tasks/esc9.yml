@@ -33,6 +33,6 @@
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
   register: esc9_output
 
-- name: Output ESC13 ACLs script result
+- name: Output ESC9 ACLs script result
   ansible.builtin.debug:
     var: esc9_output
