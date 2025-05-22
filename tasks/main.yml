@@ -168,5 +168,9 @@
   include_tasks: esc15.yml
   when: ludus_adcs_esc15 is true
 
+- name: Set up ESC16
+  include_tasks: esc16.yml
+  when: ludus_adcs_esc16 is true
+
 - name: Refresh
   ansible.windows.win_command: gpupdate /force
