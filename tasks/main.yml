@@ -117,13 +117,28 @@
 
 - name: Install templates
   ansible.windows.win_shell: |
-    if (-not(Get-ADCSTemplate -DisplayName "{{ adcs_template_name }}")) { New-ADCSTemplate -DisplayName "{{ adcs_template_name }}" -JSON (Get-Content c:\ludus\adcs\{{ adcs_template_name }}.json -Raw) -Identity "{{ domain_name }}\Domain Users" -Publish }
+    $sourceFile = "{{ adcs_template_name }}"
+    $displayName = "{{ adcs_display_name }}"
+
+    Write-Host "Processing: SourceFile='$sourceFile.json' DisplayName='$displayName'"
+
+    if (-not(Get-ADCSTemplate -DisplayName "$displayName")) {
+      Write-Host "Creating template '$displayName' from $sourceFile.json"
+      New-ADCSTemplate -DisplayName "$displayName" `
+        -JSON (Get-Content "c:\ludus\adcs\$sourceFile.json" -Raw) `
+        -Identity "{{ domain_name }}\Domain Users" `
+        -Publish
+      Write-Host "Successfully created template '$displayName'"
+    } else {
+      Write-Host "Template '$displayName' already exists, skipping"
+    }
   vars:
     ansible_become: true
     ansible_become_method: runas
     domain_name: "{{ ludus_adcs_domain }}"
     ansible_become_user: "{{ ludus_adcs_domain_username }}"
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
+    adcs_display_name: "{{ ludus_adcs_template_display_names[adcs_template_name] | default(adcs_template_name) }}"
   loop: "{{ escs_to_enable | upper }}"
   loop_control:
     loop_var: adcs_template_name
@@ -174,3 +189,4 @@
 
 - name: Refresh
   ansible.windows.win_command: gpupdate /force
+

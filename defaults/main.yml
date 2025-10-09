@@ -38,7 +38,26 @@ ludus_adcs_esc9_password: ESC9password
 ludus_adcs_esc13_user: esc13user
 ludus_adcs_esc13_password: ESC13password
 ludus_adcs_esc13_group: esc13group
-ludus_adcs_esc13_template: ESC13
 
 ludus_adcs_esc16_user: esc16user
 ludus_adcs_esc16_password: ESC16password
+
+# Template display name customization
+ludus_adcs_esc1_display_name: "ESC1"
+ludus_adcs_esc2_display_name: "ESC2"
+ludus_adcs_esc3_display_name: "ESC3"
+ludus_adcs_esc3_cra_display_name: "ESC3_CRA"
+ludus_adcs_esc4_display_name: "ESC4"
+ludus_adcs_esc7_display_name: "ESC7_CertMgr"
+ludus_adcs_esc9_display_name: "ESC9"
+ludus_adcs_esc13_display_name: "ESC13"
+
+ludus_adcs_template_display_names:
+  ESC1: "{{ ludus_adcs_esc1_display_name }}"
+  ESC2: "{{ ludus_adcs_esc2_display_name }}"
+  ESC3: "{{ ludus_adcs_esc3_display_name }}"
+  ESC3_CRA: "{{ ludus_adcs_esc3_cra_display_name }}"
+  ESC4: "{{ ludus_adcs_esc4_display_name }}"
+  ESC7_CERTMGR: "{{ ludus_adcs_esc7_display_name }}"
+  ESC9: "{{ ludus_adcs_esc9_display_name }}"
+  ESC13: "{{ ludus_adcs_esc13_display_name }}"

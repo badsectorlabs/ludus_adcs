@@ -49,6 +49,6 @@
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
   register: esc11_start_output
 
-- name: Output ESC7 script result
+- name: Output ESC11 script result
   ansible.builtin.debug:
     var: esc11_start_output
