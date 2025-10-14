@@ -71,7 +71,7 @@
       }
     parameters:
       for: "Domain Users"
-      to: "CN={{ ludus_adcs_esc4_display_name }},CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC={{ ludus_domain_netbios_name }},DC={{ ludus_domain_fqdn_tail.split('.') | join(',DC=') }}"
+      to: "CN={{ ludus_adcs_esc4_display_name }},CN=Certificate Templates,CN=Public Key Services,CN=Services,CN=Configuration,DC={{ ludus_domain_netbios_name }},DC={{ ludus_domain_fqdn_tail.split('.') | string | join(',DC=') }}"
       right: "GenericAll"
       inheritance: "None"
   vars:
