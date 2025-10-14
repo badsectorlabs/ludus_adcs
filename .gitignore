@@ -1,4 +1,5 @@
 ### Ansible ###
+.ansible
 *.retry
 
 ### macOS ###
