@@ -36,7 +36,7 @@
 
 - name: Run ESC13 script
   ansible.windows.win_shell: |
-    C:\ludus\adcs\esc13.ps1 -esc13group '{{ ludus_adcs_esc13_group }}' -esc13templateName '{{ ludus_adcs_esc13_template }}' -esc13user '{{ ludus_adcs_esc13_user }}'
+    C:\ludus\adcs\esc13.ps1 -esc13group '{{ ludus_adcs_esc13_group }}' -esc13templateName '{{ ludus_adcs_esc13_display_name }}' -esc13user '{{ ludus_adcs_esc13_user }}'
   become: true
   become_method: runas
   vars:

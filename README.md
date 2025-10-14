@@ -65,10 +65,30 @@ Available variables are listed below, along with default values (see `defaults/m
     ludus_adcs_esc13_user: esc13user
     ludus_adcs_esc13_password: ESC13password
     ludus_adcs_esc13_group: esc13group
-    ludus_adcs_esc13_template: ESC13
 
     ludus_adcs_esc16_user: esc16user
     ludus_adcs_esc16_password: ESC16password
+
+    # Template display name customization
+    ludus_adcs_esc1_display_name: "ESC1"
+    ludus_adcs_esc2_display_name: "ESC2"
+    ludus_adcs_esc3_display_name: "ESC3"
+    ludus_adcs_esc3_cra_display_name: "ESC3_CRA"
+    ludus_adcs_esc4_display_name: "ESC4"
+    ludus_adcs_esc7_display_name: "ESC7_CertMgr"
+    ludus_adcs_esc9_display_name: "ESC9"
+    ludus_adcs_esc13_display_name: "ESC13"
+
+    ludus_adcs_template_display_names:
+        ESC1: "{{ ludus_adcs_esc1_display_name }}"
+        ESC2: "{{ ludus_adcs_esc2_display_name }}"
+        ESC3: "{{ ludus_adcs_esc3_display_name }}"
+        ESC3_CRA: "{{ ludus_adcs_esc3_cra_display_name }}"
+        ESC4: "{{ ludus_adcs_esc4_display_name }}"
+        ESC7_CERTMGR: "{{ ludus_adcs_esc7_display_name }}"
+        ESC9: "{{ ludus_adcs_esc9_display_name }}"
+        ESC13: "{{ ludus_adcs_esc13_display_name }}"
+
 
 ## Dependencies
 
@@ -101,6 +121,16 @@ None.
     ludus_adcs_esc13: true
     ludus_adcs_esc15: true
     ludus_adcs_esc16: true
+    # Rename templates (optional)
+    ludus_adcs_template_display_names:
+        ESC1: "WorkstationAuth"
+        ESC2: "DocEncryption"
+        ESC3: "EmployeeCert"
+        ESC3_CRA: "EnrollmentAgent"
+        ESC4: "LegacyApp"
+        ESC7_CERTMGR: "Certmgr"
+        ESC9: "ServerAuth"
+        ESC13: "Smartcard" 
 ```
 
 ## Example Ludus Range Config
@@ -123,6 +153,16 @@ ludus:
       - badsectorlabs.ludus_adcs
     role_vars:
       ludus_adcs_esc6: false # By default ESC1,2,3,4,5,6,7,8,9,11,13,15, and 16 are enabled
+      # Rename templates (optional)
+      ludus_adcs_template_display_names:
+        ESC1: "WorkstationAuth"
+        ESC2: "DocEncryption"
+        ESC3: "EmployeeCert"
+        ESC3_CRA: "EnrollmentAgent"
+        ESC4: "LegacyApp"
+        ESC7_CERTMGR: "Certmgr"
+        ESC9: "ServerAuth"
+        ESC13: "Smartcard"
 ```
 
 ## License
@@ -140,3 +180,5 @@ The inlcuded [PSPKI](https://github.com/PKISolutions/PSPKI/) project is licensed
 This role was created in 2024 by [Bad Sector Labs](https://badsectorlabs.com/), for [Ludus](https://ludus.cloud/).
 
 Support for ESC5, ESC7, ESC9, ESC11, and ESC15 was added in November 2024, and ESC16 in May 2025 by [Brady McLaughlin](https://github.com/bradyjmcl).
+
+Support for template name customization in October 2025 by [mojeda101](https://github.com/mojeda101).
