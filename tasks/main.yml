@@ -139,7 +139,7 @@
     ansible_become_user: "{{ ludus_adcs_domain_username }}"
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
     adcs_display_name: "{{ ludus_adcs_template_display_names[adcs_template_name] | default(adcs_template_name) }}"
-  loop: "{{ escs_to_enable | upper }}"
+  loop: "{{ escs_to_enable | map('upper') | list }}" 
   loop_control:
     loop_var: adcs_template_name
 
