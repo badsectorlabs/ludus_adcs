@@ -4,7 +4,7 @@
     msg: "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
 
 - name: Create an ESC13 domain user
-  community.windows.win_domain_user:
+  microsoft.ad.user:
     name: "{{ ludus_adcs_esc13_user }}"
     password: "{{ ludus_adcs_esc13_password }}"
     upn: "{{ ludus_adcs_esc13_user }}"
@@ -16,7 +16,7 @@
     domain_server: "{{ ludus_adcs_dc }}"
 
 - name: Create an ESC13 domain group
-  community.windows.win_domain_group:
+  microsoft.ad.group:
     name: "{{ ludus_adcs_esc13_group }}"
     scope: universal
     state: present
