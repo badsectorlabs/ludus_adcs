@@ -4,7 +4,7 @@
     msg: "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
 
 - name: Create an ESC16 domain user
-  community.windows.win_domain_user:
+  microsoft.ad.user:
     name: "{{ ludus_adcs_esc16_user }}"
     password: "{{ ludus_adcs_esc16_password }}"
     upn: "{{ ludus_adcs_esc16_user }}"
@@ -22,7 +22,8 @@
 
 - name: Run ESC16 script
   ansible.windows.win_shell: |
-    C:\ludus\adcs\esc16.ps1 -esc16user '{{ ludus_adcs_esc16_user }}' | Select-String -Pattern 'Domain Users'
+    $domainUsersName = (Get-ADGroup -Identity "$((Get-ADDomain).DomainSID)-513").Name
+    C:\ludus\adcs\esc16.ps1 -esc16user '{{ ludus_adcs_esc16_user }}' | Select-String -Pattern $domainUsersName
   become: true
   become_method: runas
   vars:

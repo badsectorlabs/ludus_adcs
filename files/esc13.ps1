@@ -107,16 +107,37 @@ Set-ADCSTemplateACL -DisplayName $esc13templateName -Type Allow -Identity $esc13
 $ADRootDSE = Get-ADRootDSE
 $ConfigurationNC = $ADRootDSE.configurationNamingContext
 $OIDContainer = "CN=OID,CN=Public Key Services,CN=Services,"+$ConfigurationNC
+
+# Wait for AD replication
+Start-Sleep -Seconds 5
+
 $OIDs = Get-ADObject -Filter * -SearchBase $OIDContainer -Properties DisplayName,Name,msPKI-Cert-Template-OID,msDS-OIDToGroupLink
-$esc13OID_dn = ($OIDS | where {$_.DisplayName -eq $IssuanceName }).DistinguishedName[0]
+$esc13OIDObject = $OIDs | Where-Object {$_.DisplayName -eq $IssuanceName} | Select-Object -First 1
+
+# Verify the OID object exists
+if (-not $esc13OIDObject) {
+    Write-Error "Issuance Policy OID '$IssuanceName' not found. Available OIDs:"
+    $OIDs | Select-Object DisplayName | Format-Table
+    exit 1
+}
+
+# Ensure we have a single string DN, not an array
+$esc13OID_dn = $esc13OIDObject.DistinguishedName
+if ($esc13OID_dn -is [array]) {
+    $esc13OID_dn = $esc13OID_dn[0]
+}
 $esc13OID_dn
 
-# Create a DirectoryEntry object for the Issuance Policy OID
-$object = New-Object System.DirectoryServices.DirectoryEntry("LDAP://$esc13OID_dn")
+# Set the msDS-OIDToGroupLink using Set-ADObject which is a more modern way of doing things
+# Indeed, DirectoryEntry is an old .NET API that requires a direct LDAP connection
+try {
+    Set-ADObject -Identity $esc13OID_dn -Replace @{'msDS-OIDToGroupLink' = $ludus_esc13_group_dn}
+    Write-Host "Successfully linked OID to group"
 
-# Set the msDS-OIDToGroupLink property to the DN of the ESC13 group
-$Toset = $ludus_esc13_group_dn
-$object.Properties["msDS-OIDToGroupLink"].Value = $Toset
-$object.CommitChanges()
-$object.RefreshCache()
-$object | select msDS-OIDToGroupLink
+    # Verify the link
+    $verifyOID = Get-ADObject -Identity $esc13OID_dn -Properties msDS-OIDToGroupLink
+    $verifyOID | Select-Object msDS-OIDToGroupLink
+} catch {
+    Write-Error "Failed to set msDS-OIDToGroupLink: $_"
+    exit 1
+}

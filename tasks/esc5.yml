@@ -4,7 +4,7 @@
     msg: "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
 
 - name: Create an ESC5 domain user
-  community.windows.win_domain_user:
+  microsoft.ad.user:
     name: "{{ ludus_adcs_esc5_user }}"
     password: "{{ ludus_adcs_esc5_password }}"
     upn: "{{ ludus_adcs_esc5_user }}"
@@ -17,14 +17,14 @@
 
 - name: Check if user is already in the Administrators group
   ansible.windows.win_shell: |
-    (net localgroup Administrators | Select-String -Pattern '{{ ludus_adcs_esc5_user }}') -ne $null
+    if ((Get-WmiObject -Class Win32_ComputerSystem).DomainRole -ge 4) { (net group "$((Get-ADGroup -Identity "$((Get-ADDomain).DomainSID)-512").Name)" /domain | Select-String -Pattern '{{ ludus_adcs_esc5_user }}') -ne $null } else { (net localgroup S-1-5-32-544 | Select-String -Pattern '{{ ludus_adcs_esc5_user }}') -ne $null }
   register: user_is_admin
   args:
     executable: powershell
 
 - name: Add ESC5 user to local administrators group
   ansible.windows.win_shell: |
-    net localgroup administrators /add '{{ ludus_adcs_esc5_user }}'
+    if ((Get-WmiObject -Class Win32_ComputerSystem).DomainRole -ge 4) { net group "$((Get-ADGroup -Identity "$((Get-ADDomain).DomainSID)-512").Name)" '{{ ludus_adcs_esc5_user }}' /add /domain } else { net localgroup S-1-5-32-544 /add '{{ ludus_adcs_esc5_user }}' }
   become: true
   become_method: runas
   vars:
