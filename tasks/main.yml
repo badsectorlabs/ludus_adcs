@@ -42,8 +42,20 @@
       try {
         Install-AdcsCertificationAuthority -Credential $Cred -CAType EnterpriseRootCA -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" -KeyLength 2048 -HashAlgorithmName SHA256 -ValidityPeriod Years -ValidityPeriodUnits 5 -CACommonName $ca_common_name -Force
         $Ansible.Changed = $true
+      } catch [Microsoft.CertificateServices.Deployment.Common.CA.CertificationAuthoritySetupException] {
+        $Ansible.Changed = $false
+        if ($_.Exception.ErrorId -eq 380) {
+          # A certification authority with the same name was found in the Active Directory.
+          # CA is already installed.
+          Write-Output $_.Exception.ErrorString
+        } else {
+          $Ansible.Failed = $true
+          throw $_
+        }
       } catch {
         $Ansible.Changed = $false
+        $Ansible.Failed = $true
+        throw $_
       }
     error_action: stop
     parameters:
