@@ -47,7 +47,7 @@
         if ($_.Exception.ErrorId -eq 380) {
           # A certification authority with the same name was found in the Active Directory.
           # CA is already installed.
-          Write-Output $_.Exception.ErrorString
+          Write-Output $_.Exception.Message
         } else {
           $Ansible.Failed = $true
           throw $_
@@ -71,8 +71,14 @@
       try {
         Install-AdcsWebEnrollment -Force
         $Ansible.Changed = $true
+      } catch [Microsoft.CertificateServices.Deployment.Common.WEP.WebEnrollmentSetupException] {
+        # Web Enrollment is already installed
+        Write-Output $_.Exception.Message
+        $Ansible.Changed = $false
       } catch {
         $Ansible.Changed = $false
+        $Ansible.Failed = $true
+        throw $_
       }
   when: ludus_adcs_esc8
 
