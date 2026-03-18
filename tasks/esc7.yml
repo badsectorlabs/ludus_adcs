@@ -13,7 +13,7 @@
     state: present
     domain_username: "{{ ludus_adcs_domain_username }}"
     domain_password: "{{ ludus_adcs_domain_password }}"
-    domain_server: "{{ ludus_adcs_dc }}"
+    domain_server: "{{ ludus_adcs_dc_ip }}"
 
 - name: Create an ESC7 Certificates Manager domain user
   microsoft.ad.user:
@@ -25,7 +25,7 @@
     state: present
     domain_username: "{{ ludus_adcs_domain_username }}"
     domain_password: "{{ ludus_adcs_domain_password }}"
-    domain_server: "{{ ludus_adcs_dc }}"
+    domain_server: "{{ ludus_adcs_dc_ip }}"
 
 - name: Copy the PSPKI Module to CA
   win_copy:

@@ -13,7 +13,7 @@
     state: present
     domain_username: "{{ ludus_adcs_domain_username }}"
     domain_password: "{{ ludus_adcs_domain_password }}"
-    domain_server: "{{ ludus_adcs_dc }}"
+    domain_server: "{{ ludus_adcs_dc_ip }}"
 
 - name: Copy ESC16 ACLs script to remote host
   ansible.windows.win_copy:
