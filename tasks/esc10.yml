@@ -1,0 +1,178 @@
+---
+# ESC10 - Weak Certificate Binding Configuration
+#
+# ESC10 Case 1: StrongCertificateBindingEnforcement = 0 on the DC
+#   - The KDC does not enforce strong cert binding, allowing fallback to UPN-based mapping
+#   - Combined with a template that omits the SID security extension (like ESC9's template),
+#     an attacker can change a "victim" account's UPN to a target, request a cert,
+#     revert the UPN, and auth as the target
+#   - Requires: GenericWrite over a user + a NoSecurityExtension template
+#
+# ESC10 Case 2: CertificateMappingMethods includes UPN mapping (0x04) on the DC
+#   - Schannel's certificate mapping uses UPN from the cert's SAN
+#   - Combined with UPN manipulation and any client auth template, attacker can
+#     authenticate via LDAPS as the target account
+#   - Requires: GenericWrite over a user + any client auth template
+#
+# This task is STANDALONE — it creates its own user, ACLs, ensures the ESC10
+# template is installed (for Case 1), and sets the registry keys on the DC.
+#
+# See: https://posts.specterops.io/certified-pre-owned-d95910965cd2
+
+- name: "ESC10 - Display configuration to be applied"
+  ansible.builtin.debug:
+    msg:
+      - "Configuring ESC10 - Weak Certificate Binding"
+      - "Case 1 (StrongCertificateBindingEnforcement=0): {{ ludus_adcs_esc10_case1 | default(true) }}"
+      - "Case 2 (CertificateMappingMethods=0x04): {{ ludus_adcs_esc10_case2 | default(true) }}"
+      - "Domain Controller: {{ ludus_adcs_dc }}"
+      - "ESC10 User: {{ ludus_adcs_esc10_user }}"
+
+# ============================================================================
+# ESC10 user creation and ACL setup
+# ============================================================================
+
+- name: "ESC10 - Create ESC10 domain user"
+  microsoft.ad.user:
+    name: "{{ ludus_adcs_esc10_user }}"
+    password: "{{ ludus_adcs_esc10_password }}"
+    upn: "{{ ludus_adcs_esc10_user }}"
+    password_never_expires: true
+    user_cannot_change_password: true
+    state: present
+    domain_username: "{{ ludus_adcs_domain_username }}"
+    domain_password: "{{ ludus_adcs_domain_password }}"
+    domain_server: "{{ ludus_adcs_dc_ip }}"
+
+- name: "ESC10 - Copy ACLs script to remote host"
+  ansible.windows.win_copy:
+    src: files/esc10.ps1
+    dest: C:\ludus\adcs\esc10.ps1
+
+# Grants GenericAll over the esc10user to Domain Users group
+# This allows any domain user to modify esc10user's UPN for the attack
+- name: "ESC10 - Run ACLs script (Domain Users get GenericAll on esc10user)"
+  ansible.windows.win_shell: |
+    $domainUsersName = (Get-ADGroup -Filter "*" | Where-Object {$_.SID -like "*-513"}).Name
+    C:\ludus\adcs\esc10.ps1 -esc10user '{{ ludus_adcs_esc10_user }}' | Select-String -Pattern $domainUsersName
+  become: true
+  become_method: runas
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    domain_name: "{{ ludus_adcs_domain }}"
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+  register: esc10_acl_output
+
+- name: "ESC10 - Output ACLs script result"
+  ansible.builtin.debug:
+    var: esc10_acl_output
+
+# ============================================================================
+# Prerequisite: Ensure ESC10 template is installed (needed for Case 1)
+# The ESC10 template has CT_FLAG_NO_SECURITY_EXTENSION, which omits the SID
+# security extension from issued certs. This is what enables UPN manipulation.
+# ============================================================================
+
+- name: "ESC10 prereq - Copy ESC10 template JSON"
+  ansible.windows.win_copy:
+    src: "files/ESC10.json"
+    dest: "C:\\ludus\\adcs\\ESC10.json"
+
+- name: "ESC10 prereq - Ensure ESC10 template is installed and published"
+  ansible.windows.win_shell: |
+    $displayName = "{{ ludus_adcs_esc10_template_name }}"
+    if (-not(Get-ADCSTemplate -DisplayName "$displayName")) {
+      Write-Host "Creating template '$displayName' from ESC10.json"
+      New-ADCSTemplate -DisplayName "$displayName" `
+        -JSON (Get-Content "c:\ludus\adcs\ESC10.json" -Raw) `
+        -Identity "{{ ludus_adcs_domain }}\Domain Users" `
+        -Publish
+      Write-Host "Successfully created template '$displayName'"
+    } else {
+      Write-Host "Template '$displayName' already exists, skipping"
+    }
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+
+# ============================================================================
+# ESC10 Case 1: Disable Strong Certificate Binding Enforcement
+# Registry: HKLM\SYSTEM\CurrentControlSet\Services\Kdc\StrongCertificateBindingEnforcement = 0
+# This must be run on the Domain Controller
+# ============================================================================
+
+- name: "ESC10 Case 1 - Set StrongCertificateBindingEnforcement to 0"
+  ansible.windows.win_powershell:
+    script: |
+      $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Kdc"
+      $regName = "StrongCertificateBindingEnforcement"
+
+      # Create the key if it doesn't exist
+      if (-not (Test-Path $regPath)) {
+          New-Item -Path $regPath -Force | Out-Null
+      }
+
+      # Get current value
+      $currentValue = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue
+
+      if ($null -ne $currentValue -and $currentValue.$regName -eq 0) {
+          Write-Output "StrongCertificateBindingEnforcement is already set to 0"
+          $Ansible.Changed = $false
+      } else {
+          Set-ItemProperty -Path $regPath -Name $regName -Value 0 -Type DWord -Force
+          Write-Output "Set StrongCertificateBindingEnforcement to 0"
+          $Ansible.Changed = $true
+      }
+  when: ludus_adcs_esc10_case1 | default(true) | bool
+  delegate_to: "{{ ludus_adcs_dc }}"
+
+# ============================================================================
+# ESC10 Case 2: Set CertificateMappingMethods to UPN (0x04)
+# Registry: HKLM\System\CurrentControlSet\Control\SecurityProviders\Schannel\CertificateMappingMethods = 0x04
+# This must be run on the Domain Controller
+# ============================================================================
+
+- name: "ESC10 Case 2 - Set CertificateMappingMethods to 0x4 (UPN)"
+  ansible.windows.win_powershell:
+    script: |
+      $regPath = "HKLM:\System\CurrentControlSet\Control\SecurityProviders\Schannel"
+      $regName = "CertificateMappingMethods"
+
+      # Create the key if it doesn't exist
+      if (-not (Test-Path $regPath)) {
+          New-Item -Path $regPath -Force | Out-Null
+      }
+
+      # Get current value
+      $currentValue = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue
+
+      if ($null -ne $currentValue -and $currentValue.$regName -eq 4) {
+          Write-Output "CertificateMappingMethods is already set to 0x4"
+          $Ansible.Changed = $false
+      } else {
+          Set-ItemProperty -Path $regPath -Name $regName -Value 4 -Type DWord -Force
+          Write-Output "Set CertificateMappingMethods to 0x4 (UPN)"
+          $Ansible.Changed = $true
+      }
+  when: ludus_adcs_esc10_case2 | default(true) | bool
+  delegate_to: "{{ ludus_adcs_dc }}"
+
+- name: "ESC10 - Display completion message"
+  ansible.builtin.debug:
+    msg: |
+      ESC10 Configuration Complete!
+
+      User: {{ ludus_adcs_esc10_user }} (Domain Users have GenericAll)
+      {{ ludus_adcs_esc10_template_name }} template installed (NoSecurityExtension — needed for Case 1)
+
+      Case 1: StrongCertificateBindingEnforcement=0 on DC
+        Attack: Change esc10user UPN → administrator, request cert from {{ ludus_adcs_esc10_template_name }} template,
+                revert UPN, authenticate via Kerberos PKINIT as administrator.
+
+      Case 2: CertificateMappingMethods=0x04 on DC
+        Attack: Change esc10user UPN → dc$@domain, request cert from any User template,
+                revert UPN, authenticate via LDAPS (Schannel) as the DC machine account.
