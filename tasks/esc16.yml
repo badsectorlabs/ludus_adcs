@@ -1,9 +1,61 @@
 ---
-- name: Display Primary DC and CA host
-  ansible.builtin.debug:
-    msg: "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
+# ESC16 - Security Extension Disabled on CA (Globally)
+#
+# ESC16 occurs when the CA has OID 1.3.6.1.4.1.311.25.2 (szOID_NTDS_CA_SECURITY_EXT)
+# in its policy\DisableExtensionList registry key. This causes ALL certificates issued
+# by the CA to lack the SID security extension, enabling UPN manipulation attacks
+# against ANY client authentication template.
+#
+# Prerequisites:
+#   - StrongCertificateBindingEnforcement <= 1 on DC (applied below if not already set by ESC10)
+#   - At enforcement level 2, ESC6 (EDITF_ATTRIBUTESUBJECTALTNAME2) is also needed
+#   - CertSvc must be restarted after DisableExtensionList change
+#
+# Key difference from ESC9: ESC9 is per-template, ESC16 is CA-wide.
+#
+# See: https://posts.specterops.io/adcs-esc16-new-attack-technique
 
-- name: Create an ESC16 domain user
+- name: "ESC16 - Display configuration"
+  ansible.builtin.debug:
+    msg:
+      - "Configuring ESC16 - Disable szOID_NTDS_CA_SECURITY_EXT on CA"
+      - "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
+      - "ESC16 User: {{ ludus_adcs_esc16_user }}"
+      - "This affects ALL templates issued by this CA"
+
+# ============================================================================
+# Prerequisite: StrongCertificateBindingEnforcement <= 1 on DC
+# Without this, the KDC enforces strong binding and ESC16 UPN manipulation fails.
+# This is idempotent — if ESC10 already set it to 0, this is a no-op.
+# ============================================================================
+
+- name: "ESC16 prereq - Ensure StrongCertificateBindingEnforcement is disabled on DC"
+  ansible.windows.win_powershell:
+    script: |
+      $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Kdc"
+      $regName = "StrongCertificateBindingEnforcement"
+
+      if (-not (Test-Path $regPath)) {
+          New-Item -Path $regPath -Force | Out-Null
+      }
+
+      $currentValue = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue
+
+      if ($null -ne $currentValue -and $currentValue.$regName -le 1) {
+          Write-Output "StrongCertificateBindingEnforcement is already $($currentValue.$regName) (<=1) - OK for ESC16"
+          $Ansible.Changed = $false
+      } else {
+          Set-ItemProperty -Path $regPath -Name $regName -Value 0 -Type DWord -Force
+          Write-Output "Set StrongCertificateBindingEnforcement to 0 (required for ESC16)"
+          $Ansible.Changed = $true
+      }
+  delegate_to: "{{ ludus_adcs_dc }}"
+
+# ============================================================================
+# ESC16 core configuration
+# ============================================================================
+
+- name: "ESC16 - Create ESC16 domain user"
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc16_user }}"
     password: "{{ ludus_adcs_esc16_password }}"
@@ -15,12 +67,14 @@
     domain_password: "{{ ludus_adcs_domain_password }}"
     domain_server: "{{ ludus_adcs_dc_ip }}"
 
-- name: Copy ESC16 ACLs script to remote host
+- name: "ESC16 - Copy ACLs script to remote host"
   ansible.windows.win_copy:
     src: files/esc16.ps1
     dest: C:\ludus\adcs\esc16.ps1
 
-- name: Run ESC16 script
+# Grants GenericAll over esc16user to Domain Users group
+# This allows any domain user to modify esc16user's UPN for the attack
+- name: "ESC16 - Run ACLs script (Domain Users get GenericAll on esc16user)"
   ansible.windows.win_shell: |
     $domainUsersName = (Get-ADGroup -Filter "*" | Where-Object {$_.SID -like "*-513"}).Name
     C:\ludus\adcs\esc16.ps1 -esc16user '{{ ludus_adcs_esc16_user }}' | Select-String -Pattern $domainUsersName
@@ -34,18 +88,100 @@
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
   register: esc16_output
 
-- name: Output ESC16 ACLs script result
+- name: "ESC16 - Output ACLs script result"
   ansible.builtin.debug:
     var: esc16_output
 
-- name: "Configure szOID_NTDS_CA_SECURITY_EXT on CA - ESC16"
-  ansible.windows.win_shell: |
-    certutil -config "{{ cauthority_server }}\{{ cauthority_common_name }}" -setreg policy\DisableExtensionList +1.3.6.1.4.1.311.25.2
+# Add szOID_NTDS_CA_SECURITY_EXT to DisableExtensionList on the CA
+# This disables the SID extension for ALL certificates issued by this CA
+# IMPORTANT: Use certutil WITHOUT -config flag when running locally on the CA.
+# Using -config tries to connect via DCOM which can fail if CertSvc is flaky.
+- name: "ESC16 - Disable szOID_NTDS_CA_SECURITY_EXT on CA"
+  ansible.windows.win_powershell:
+    script: |
+      # Verify CertSvc is running before modifying config
+      $svc = Get-Service -Name CertSvc -ErrorAction SilentlyContinue
+      if (-not $svc -or $svc.Status -ne 'Running') {
+          Write-Error "CertSvc is not running. Cannot modify DisableExtensionList."
+          $Ansible.Failed = $true
+          return
+      }
+
+      # Check if the OID is already in DisableExtensionList (local CA, no -config flag)
+      $output = certutil -getreg policy\DisableExtensionList 2>&1
+      if ($output -match "1\.3\.6\.1\.4\.1\.311\.25\.2") {
+          Write-Output "szOID_NTDS_CA_SECURITY_EXT is already in DisableExtensionList"
+          $Ansible.Changed = $false
+      } else {
+          # Use certutil -setreg without -config (targets local CA)
+          $result = certutil -setreg policy\DisableExtensionList +1.3.6.1.4.1.311.25.2
+          Write-Output "Added szOID_NTDS_CA_SECURITY_EXT to DisableExtensionList"
+          Write-Output $result
+          $Ansible.Changed = $true
+      }
   vars:
     ansible_become: true
     ansible_become_method: runas
     ansible_become_user: "{{ ludus_adcs_domain_username }}"
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
-    cauthority_server: "{{ ludus_adcs_ca_host }}"
-    cauthority_common_name: "{{ ludus_adcs_ca_common_name }}"
-  when: ludus_adcs_esc16 is true
+  register: esc16_disable_ext_result
+
+# CertSvc MUST be restarted for the DisableExtensionList change to take effect.
+# After certutil -setreg, the service may fail to start without a reboot.
+# Strategy: try graceful restart first, if that fails, reboot the server.
+- name: "ESC16 - Try to restart CertSvc gracefully"
+  ansible.windows.win_powershell:
+    script: |
+      $svc = Get-Service -Name CertSvc -ErrorAction SilentlyContinue
+
+      # Stop the service if it's running
+      if ($svc -and $svc.Status -eq 'Running') {
+          Stop-Service -Name CertSvc -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 3
+      }
+
+      # Try to start it
+      try {
+          Start-Service -Name CertSvc -ErrorAction Stop
+          Start-Sleep -Seconds 5
+          $svc = Get-Service -Name CertSvc
+          if ($svc.Status -eq 'Running') {
+              Write-Output "CertSvc restarted successfully"
+              $Ansible.Changed = $true
+              $Ansible.Result.reboot_needed = $false
+          } else {
+              Write-Output "CertSvc did not reach Running state - reboot needed"
+              $Ansible.Changed = $true
+              $Ansible.Result.reboot_needed = $true
+          }
+      } catch {
+          Write-Output "CertSvc failed to start: $($_.Exception.Message) - reboot needed"
+          $Ansible.Changed = $true
+          $Ansible.Result.reboot_needed = $true
+      }
+  vars:
+    ansible_become: true
+    ansible_become_method: runas
+    ansible_become_user: "{{ ludus_adcs_domain_username }}"
+    ansible_become_password: "{{ ludus_adcs_domain_password }}"
+  register: esc16_restart_result
+  when: esc16_disable_ext_result.changed | default(true)
+
+- name: "ESC16 - Reboot CA server if CertSvc cannot restart"
+  ansible.windows.win_reboot:
+    reboot_timeout: 300
+    post_reboot_delay: 30
+  when:
+    - esc16_disable_ext_result.changed | default(true)
+    - esc16_restart_result.result.reboot_needed | default(false)
+
+- name: "ESC16 - Verify CertSvc is running after restart/reboot"
+  ansible.windows.win_service:
+    name: CertSvc
+    state: started
+    start_mode: auto
+  register: esc16_certsvc_final
+  retries: 3
+  delay: 15
+  until: esc16_certsvc_final is not failed
+  when: esc16_disable_ext_result.changed | default(true)

@@ -1,9 +1,56 @@
 ---
-- name: Display Primary DC and CA host
-  ansible.builtin.debug:
-    msg: "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
+# ESC9 - No Security Extension on Certificate Template
+#
+# ESC9 occurs when a certificate template has CT_FLAG_NO_SECURITY_EXTENSION
+# in msPKI-Enrollment-Flag, causing the CA to omit the szOID_NTDS_CA_SECURITY_EXT
+# OID from issued certificates. This allows UPN manipulation attacks.
+#
+# Prerequisites:
+#   - StrongCertificateBindingEnforcement <= 1 on DC (applied below if not already set by ESC10)
+#   - At enforcement level 2, ESC6 (EDITF_ATTRIBUTESUBJECTALTNAME2) is also needed
+#
+# See: https://posts.specterops.io/certified-pre-owned-d95910965cd2
 
-- name: Create an ESC9 domain user
+- name: "ESC9 - Display configuration"
+  ansible.builtin.debug:
+    msg:
+      - "Configuring ESC9 - No Security Extension on Certificate Template"
+      - "DC: {{ ludus_adcs_dc }} | CA: {{ ludus_adcs_ca_host }}"
+      - "ESC9 User: {{ ludus_adcs_esc9_user }}"
+
+# ============================================================================
+# Prerequisite: StrongCertificateBindingEnforcement <= 1 on DC
+# Without this, the KDC enforces strong binding and ESC9 UPN manipulation fails.
+# This is idempotent — if ESC10 already set it to 0, this is a no-op.
+# ============================================================================
+
+- name: "ESC9 prereq - Ensure StrongCertificateBindingEnforcement is disabled on DC"
+  ansible.windows.win_powershell:
+    script: |
+      $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\Kdc"
+      $regName = "StrongCertificateBindingEnforcement"
+
+      if (-not (Test-Path $regPath)) {
+          New-Item -Path $regPath -Force | Out-Null
+      }
+
+      $currentValue = Get-ItemProperty -Path $regPath -Name $regName -ErrorAction SilentlyContinue
+
+      if ($null -ne $currentValue -and $currentValue.$regName -le 1) {
+          Write-Output "StrongCertificateBindingEnforcement is already $($currentValue.$regName) (<=1) - OK for ESC9"
+          $Ansible.Changed = $false
+      } else {
+          Set-ItemProperty -Path $regPath -Name $regName -Value 0 -Type DWord -Force
+          Write-Output "Set StrongCertificateBindingEnforcement to 0 (required for ESC9)"
+          $Ansible.Changed = $true
+      }
+  delegate_to: "{{ ludus_adcs_dc }}"
+
+# ============================================================================
+# ESC9 core configuration
+# ============================================================================
+
+- name: "ESC9 - Create ESC9 domain user"
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc9_user }}"
     password: "{{ ludus_adcs_esc9_password }}"
@@ -15,12 +62,14 @@
     domain_password: "{{ ludus_adcs_domain_password }}"
     domain_server: "{{ ludus_adcs_dc_ip }}"
 
-- name: Copy ESC9 ACLs script to remote host
+- name: "ESC9 - Copy ACLs script to remote host"
   ansible.windows.win_copy:
     src: files/esc9.ps1
     dest: C:\ludus\adcs\esc9.ps1
 
-- name: Run ESC9 script
+# Grants GenericAll over the esc9user to Domain Users group
+# This allows any domain user to modify esc9user's UPN for the attack
+- name: "ESC9 - Run ACLs script (Domain Users get GenericAll on esc9user)"
   ansible.windows.win_shell: |
     $domainUsersName = (Get-ADGroup -Filter "*" | Where-Object {$_.SID -like "*-513"}).Name
     C:\ludus\adcs\esc9.ps1 -esc9user '{{ ludus_adcs_esc9_user }}' | Select-String -Pattern $domainUsersName
@@ -34,6 +83,6 @@
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
   register: esc9_output
 
-- name: Output ESC9 ACLs script result
+- name: "ESC9 - Output ACLs script result"
   ansible.builtin.debug:
     var: esc9_output
