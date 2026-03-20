@@ -1,12 +1,17 @@
 ---
 # This pulls the netbios_name out of the domain assigned to this machine in the ludus range config
 ludus_adcs_domain: "{{ (ludus | selectattr('vm_name', 'match', inventory_hostname))[0].domain.fqdn.split('.')[0] }}"
+# This pulls the DC config entry for the domain assigned to this machine
+ludus_adcs_dc_config: "{{ (ludus | selectattr('domain', 'defined') | selectattr('domain.fqdn', 'match', ludus_adcs_domain) | selectattr('domain.role', 'match', 'primary-dc'))[0] }}"
 # This pulls the vm_name of the primary-dc for the domain assigned to this machine in the ludus range config
-ludus_adcs_dc: "{{ (ludus | selectattr('domain', 'defined') | selectattr('domain.fqdn', 'match', ludus_adcs_domain) | selectattr('domain.role', 'match', 'primary-dc'))[0].hostname }}"
+ludus_adcs_dc: "{{ ludus_adcs_dc_config.vm_name }}"
+# DC IP address for delegate_to (required for Windows delegation)
+ludus_adcs_dc_ip: "10.{{ range_second_octet }}.{{ ludus_adcs_dc_config.vlan }}.{{ ludus_adcs_dc_config.ip_last_octet }}"
 # This pulls the hostname from the ludus config for this host
 ludus_adcs_ca_host: "{{ (ludus | selectattr('vm_name', 'match', inventory_hostname))[0].hostname }}"
 ludus_adcs_domain_username: "{{ ludus_adcs_domain }}\\{{ defaults.ad_domain_admin }}"
 ludus_adcs_domain_password: "{{ defaults.ad_domain_admin_password }}"
+ludus_adcs_domain_fqdn: "{{ ludus_adcs_dc_config.domain.fqdn }}"
 ludus_adcs_ca_common_name: "{{ ludus_adcs_domain }}-CA"
 ludus_adcs_esc1: true
 ludus_adcs_esc2: true
@@ -18,8 +23,12 @@ ludus_adcs_esc6: true
 ludus_adcs_esc7: true
 ludus_adcs_esc8: true
 ludus_adcs_esc9: true
+ludus_adcs_esc10: true
+ludus_adcs_esc10_case1: true
+ludus_adcs_esc10_case2: true
 ludus_adcs_esc11: true
 ludus_adcs_esc13: true
+ludus_adcs_esc14: true
 ludus_adcs_esc15: true
 ludus_adcs_esc16: true
 
@@ -35,9 +44,19 @@ ludus_adcs_esc7_cert_manager_password: ESC7password
 ludus_adcs_esc9_user: esc9user
 ludus_adcs_esc9_password: ESC9password
 
+ludus_adcs_esc10_user: esc10user
+ludus_adcs_esc10_password: ESC10password
+ludus_adcs_esc10_template_name: ESC10
+
 ludus_adcs_esc13_user: esc13user
 ludus_adcs_esc13_password: ESC13password
 ludus_adcs_esc13_group: esc13group
+
+ludus_adcs_esc14_user: esc14user
+ludus_adcs_esc14_password: ESC14password
+ludus_adcs_esc14_target_user: esc14target
+ludus_adcs_esc14_target_password: ESC14targetPassword
+ludus_adcs_esc14_create_users: true  # Set to false to use pre-existing users (e.g., from GOAD)
 
 ludus_adcs_esc16_user: esc16user
 ludus_adcs_esc16_password: ESC16password

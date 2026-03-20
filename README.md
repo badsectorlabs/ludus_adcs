@@ -9,8 +9,10 @@ An Ansible Role that installs [ADCS](https://learn.microsoft.com/en-us/windows-s
 - Optionally, creates users (`esc7_camgr_user` and `esc7_certmgr_user`) to exploit ESC7
 - Optionally, enables web enrollment for ESC8
 - Optionally, creates a user (`esc9user`) with inbound GenericAll rights for ESC9
+- Optionally, configures weak certificate binding on DC for ESC10 (StrongCertificateBindingEnforcement=0 and/or CertificateMappingMethods=0x04)
 - Optionally, configures IF_ENFORCEENCRYPTICERTREQUEST on CA for ESC11
 - Optionally, for ESC13, creates a user (`esc13user`), group (`esc13group`), template (`ESC13`), and Issuance policy (`IssuancePolicyForESC13`)
+- Optionally, creates users (`esc14user` and `esc14target`) and grants GenericWrite for ESC14 (altSecurityIdentities abuse)
 - Optionally, makes the `WebServer` template vulnerable to ESC15
 - Optionally, configures szOID_NTDS_CA_SECURITY_EXT on CA and creates a user (`esc16user`) with inbound GenericAll rights for ESC16
 
@@ -45,8 +47,17 @@ Available variables are listed below, along with default values (see `defaults/m
     ludus_adcs_esc7: true
     ludus_adcs_esc8: true
     ludus_adcs_esc9: true
+    ludus_adcs_esc10: true
+    ludus_adcs_esc10_case1: true  # StrongCertificateBindingEnforcement=0 on DC
+    ludus_adcs_esc10_case2: true  # CertificateMappingMethods=0x04 on DC
     ludus_adcs_esc11: true
     ludus_adcs_esc13: true
+    ludus_adcs_esc14: true
+    ludus_adcs_esc14_user: esc14user                 # Attacker with GenericWrite
+    ludus_adcs_esc14_password: ESC14password
+    ludus_adcs_esc14_target_user: esc14target        # Target with vulnerable altSecurityIdentities
+    ludus_adcs_esc14_target_password: ESC14targetPassword
+    ludus_adcs_esc14_create_users: true              # Set to false to use pre-existing users
     ludus_adcs_esc15: true
     ludus_adcs_esc16: true
 
