@@ -23,38 +23,168 @@
     state: present
   when: ludus_adcs_esc8
 
-- name: Install-ADCSCertificationAuthority-PS
+# Install and configure CA with full recovery logic:
+# 1. Install CA
+# 2. Try to start CertSvc
+# 3. If it fails → reboot → try again
+# 4. If STILL fails → uninstall CA, reboot, reinstall CA, reboot → start
+- name: Install CA and ensure CertSvc is running
   ansible.windows.win_powershell:
     script: |
       [CmdletBinding()]
       param (
-          [String]
-          $domain_username,
-
-          [String]
-          $domain_password,
-
-          [String]
-          $ca_common_name
+          [String]$domain_username,
+          [String]$domain_password,
+          [String]$ca_common_name
       )
+
       $pass = ConvertTo-SecureString $domain_password -AsPlainText -Force
       $Cred = New-Object System.Management.Automation.PSCredential ($domain_username, $pass)
-      try {
-        Install-AdcsCertificationAuthority -Credential $Cred -CAType EnterpriseRootCA -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" -KeyLength 2048 -HashAlgorithmName SHA256 -ValidityPeriod Years -ValidityPeriodUnits 5 -CACommonName $ca_common_name -Force
-        $Ansible.Changed = $true
-      } catch [Microsoft.CertificateServices.Deployment.Common.CA.CertificationAuthoritySetupException] {
-        $Ansible.Changed = $false
-        Write-Output $_.Exception.Message
-      } catch {
-        $Ansible.Changed = $false
-        $Ansible.Failed = $true
-        throw $_
+
+      function Install-CA {
+          try {
+              $result = Install-AdcsCertificationAuthority -Credential $Cred `
+                  -CAType EnterpriseRootCA `
+                  -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+                  -KeyLength 2048 -HashAlgorithmName SHA256 `
+                  -ValidityPeriod Years -ValidityPeriodUnits 5 `
+                  -CACommonName $ca_common_name -Force
+              Write-Output "CA installed successfully"
+              return $true
+          } catch [Microsoft.CertificateServices.Deployment.Common.CA.CertificationAuthoritySetupException] {
+              Write-Output "CA already configured: $($_.Exception.Message)"
+              return $false
+          } catch {
+              Write-Output "CA install failed: $($_.Exception.Message)"
+              throw $_
+          }
       }
+
+      function Test-CertSvc {
+          try {
+              Start-Service -Name CertSvc -ErrorAction Stop
+              Start-Sleep -Seconds 5
+              $svc = Get-Service -Name CertSvc -ErrorAction Stop
+              return ($svc.Status -eq 'Running')
+          } catch {
+              Write-Output "CertSvc failed to start: $($_.Exception.Message)"
+              return $false
+          }
+      }
+
+      # Step 1: Install CA (or detect already installed)
+      $freshInstall = Install-CA
+
+      # Step 2: Check if CertSvc is running
+      $svc = Get-Service -Name CertSvc -ErrorAction SilentlyContinue
+      if ($svc -and $svc.Status -eq 'Running') {
+          Write-Output "CertSvc is already running - CA is healthy"
+          $Ansible.Changed = $freshInstall
+          return
+      }
+
+      # Step 3: Try to start CertSvc
+      if (Test-CertSvc) {
+          Write-Output "CertSvc started successfully"
+          $Ansible.Changed = $true
+          return
+      }
+
+      # Step 4: CertSvc won't start — need a reboot
+      Write-Output "CertSvc cannot start - requesting reboot"
+      $Ansible.Changed = $true
+      $Ansible.Result = @{ certsvc_needs_reboot = $true }
     error_action: stop
     parameters:
       domain_username: "{{ ludus_adcs_domain_username }}"
       domain_password: "{{ ludus_adcs_domain_password }}"
       ca_common_name: "{{ ludus_adcs_ca_common_name }}"
+  register: adcs_ca_install_result
+
+# Reboot if CertSvc couldn't start
+- name: Reboot CA server (CertSvc needs reboot to start)
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+    post_reboot_delay: 60
+  when: (adcs_ca_install_result.result.certsvc_needs_reboot | default(false)) | bool
+
+# After reboot, try to start CertSvc
+- name: Try to start CertSvc after reboot
+  ansible.windows.win_service:
+    name: CertSvc
+    state: started
+    start_mode: auto
+  register: certsvc_after_reboot
+  retries: 3
+  delay: 30
+  until: certsvc_after_reboot is not failed
+  ignore_errors: true
+  when: (adcs_ca_install_result.result.certsvc_needs_reboot | default(false)) | bool
+
+# Recovery: If CertSvc STILL won't start, the CA is corrupt.
+# Uninstall CA config, reboot, reinstall, reboot again.
+- name: "Recovery - Uninstall broken CA configuration"
+  ansible.windows.win_powershell:
+    script: |
+      [CmdletBinding()]
+      param ([String]$domain_username, [String]$domain_password)
+      $pass = ConvertTo-SecureString $domain_password -AsPlainText -Force
+      $Cred = New-Object System.Management.Automation.PSCredential ($domain_username, $pass)
+      try {
+          Uninstall-AdcsCertificationAuthority -Force
+          Write-Output "CA uninstalled successfully"
+          $Ansible.Changed = $true
+      } catch {
+          Write-Output "Uninstall attempt: $($_.Exception.Message)"
+          $Ansible.Changed = $false
+      }
+    parameters:
+      domain_username: "{{ ludus_adcs_domain_username }}"
+      domain_password: "{{ ludus_adcs_domain_password }}"
+  when: certsvc_after_reboot is defined and certsvc_after_reboot is failed
+
+- name: "Recovery - Reboot after CA uninstall"
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+    post_reboot_delay: 60
+  when: certsvc_after_reboot is defined and certsvc_after_reboot is failed
+
+- name: "Recovery - Reinstall CA after cleanup"
+  ansible.windows.win_powershell:
+    script: |
+      [CmdletBinding()]
+      param ([String]$domain_username, [String]$domain_password, [String]$ca_common_name)
+      $pass = ConvertTo-SecureString $domain_password -AsPlainText -Force
+      $Cred = New-Object System.Management.Automation.PSCredential ($domain_username, $pass)
+      Install-AdcsCertificationAuthority -Credential $Cred `
+          -CAType EnterpriseRootCA `
+          -CryptoProviderName "RSA#Microsoft Software Key Storage Provider" `
+          -KeyLength 2048 -HashAlgorithmName SHA256 `
+          -ValidityPeriod Years -ValidityPeriodUnits 5 `
+          -CACommonName $ca_common_name -Force -OverwriteExistingKey
+      $Ansible.Changed = $true
+    error_action: stop
+    parameters:
+      domain_username: "{{ ludus_adcs_domain_username }}"
+      domain_password: "{{ ludus_adcs_domain_password }}"
+      ca_common_name: "{{ ludus_adcs_ca_common_name }}"
+  when: certsvc_after_reboot is defined and certsvc_after_reboot is failed
+
+- name: "Recovery - Reboot after CA reinstall"
+  ansible.windows.win_reboot:
+    reboot_timeout: 600
+    post_reboot_delay: 60
+  when: certsvc_after_reboot is defined and certsvc_after_reboot is failed
+
+- name: "Ensure CertSvc service is running"
+  ansible.windows.win_service:
+    name: CertSvc
+    state: started
+    start_mode: auto
+  register: certsvc_final
+  retries: 5
+  delay: 30
+  until: certsvc_final is not failed
 
 - name: Enable Web enrollment
   ansible.windows.win_powershell:
@@ -74,6 +204,49 @@
         throw $_
       }
   when: ludus_adcs_esc8
+
+- name: Dismiss Server Manager 'Configuration Required' notification for ADCS
+  ansible.windows.win_powershell:
+    script: |
+      # Clear the Server Manager post-deployment configuration flag for ADCS roles
+      # This dismisses the yellow "Configuration required" notification in Server Manager
+      # that appears when ADCS is configured via PowerShell instead of the GUI wizard.
+
+      $smRegPath = "HKLM:\SOFTWARE\Microsoft\ServerManager\ServicingStorage\ServerComponentCache"
+
+      # Mark AD-Certificate role services as configured
+      $adcsComponents = @(
+        "AD-Certificate",
+        "ADCS-Cert-Authority",
+        "ADCS-Web-Enrollment"
+      )
+
+      foreach ($component in $adcsComponents) {
+        $componentPath = Join-Path $smRegPath $component
+        if (Test-Path $componentPath) {
+          $current = Get-ItemProperty -Path $componentPath -Name "ConfigurationStatus" -ErrorAction SilentlyContinue
+          if ($null -eq $current -or $current.ConfigurationStatus -ne 2) {
+            Set-ItemProperty -Path $componentPath -Name "ConfigurationStatus" -Value 2 -Type DWord -Force
+            $Ansible.Changed = $true
+          }
+        }
+      }
+
+      # Alternative approach: notify Server Manager the configuration is done via BPA
+      # This uses the ServerManager module to refresh its state
+      try {
+        Import-Module ServerManager -ErrorAction SilentlyContinue
+        # Verify CertSvc service is running as proof CA is configured
+        $certSvc = Get-Service -Name CertsVc -ErrorAction SilentlyContinue
+        if ($certSvc -and $certSvc.Status -eq 'Running') {
+          Write-Output "CertSvc is running - CA is properly configured"
+        } else {
+          Write-Output "Warning: CertSvc service not found or not running"
+        }
+      } catch {
+        Write-Output "ServerManager module not available: $($_.Exception.Message)"
+      }
+  changed_when: false
 
 - name: Copy the ADCSTemplate Module to CA
   win_copy:
@@ -154,16 +327,35 @@
   loop_control:
     loop_var: adcs_template_name
 
+# IMPORTANT: Use certutil WITHOUT -config flag when running locally on the CA.
+# Using -config connects via DCOM which can corrupt the CA Configuration registry.
 - name: "Configure ATTRIBUTESUBJECTALTNAME2 on CA - ESC6"
-  ansible.windows.win_shell: |
-    certutil -config "{{ cauthority_server }}\{{ cauthority_common_name }}" -setreg policy\Editflags +EDITF_ATTRIBUTESUBJECTALTNAME2
+  ansible.windows.win_powershell:
+    script: |
+      # Verify CertSvc is running before modifying config
+      $svc = Get-Service -Name CertSvc -ErrorAction SilentlyContinue
+      if (-not $svc -or $svc.Status -ne 'Running') {
+          Write-Error "CertSvc is not running. Cannot modify Editflags."
+          $Ansible.Failed = $true
+          return
+      }
+
+      # Check if already set (no -config flag — targets local CA)
+      $output = certutil -getreg policy\Editflags 2>&1
+      if ($output -match "EDITF_ATTRIBUTESUBJECTALTNAME2") {
+          Write-Output "EDITF_ATTRIBUTESUBJECTALTNAME2 is already set"
+          $Ansible.Changed = $false
+      } else {
+          $result = certutil -setreg policy\Editflags +EDITF_ATTRIBUTESUBJECTALTNAME2
+          Write-Output "Added EDITF_ATTRIBUTESUBJECTALTNAME2"
+          Write-Output $result
+          $Ansible.Changed = $true
+      }
   vars:
     ansible_become: true
     ansible_become_method: runas
     ansible_become_user: "{{ ludus_adcs_domain_username }}"
     ansible_become_password: "{{ ludus_adcs_domain_password }}"
-    cauthority_server: "{{ ludus_adcs_ca_host }}"
-    cauthority_common_name: "{{ ludus_adcs_ca_common_name }}"
   when: ludus_adcs_esc6 is true
 
 - name: Set up ESC4
@@ -182,6 +374,10 @@
   include_tasks: esc9.yml
   when: ludus_adcs_esc9 is true
 
+- name: Set up ESC10
+  include_tasks: esc10.yml
+  when: ludus_adcs_esc10 is true
+
 - name: Set up ESC11
   include_tasks: esc11.yml
   when: ludus_adcs_esc11 is true
@@ -194,9 +390,15 @@
   include_tasks: esc15.yml
   when: ludus_adcs_esc15 is true
 
+# ESC16 must run before ESC14 — ESC16 disables the SID extension on the CA,
+# which ESC14 requires so that new certs don't embed the requester's SID.
 - name: Set up ESC16
   include_tasks: esc16.yml
   when: ludus_adcs_esc16 is true
+
+- name: Set up ESC14
+  include_tasks: esc14.yml
+  when: ludus_adcs_esc14 is true
 
 - name: Refresh
   ansible.windows.win_command: gpupdate /force
