@@ -7,7 +7,7 @@
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc5_user }}"
     password: "{{ ludus_adcs_esc5_password }}"
-    upn: "{{ ludus_adcs_esc5_user }}"
+    upn: "{{ ludus_adcs_esc5_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true
     state: present

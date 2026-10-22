@@ -7,7 +7,7 @@
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc7_ca_manager_user }}"
     password: "{{ ludus_adcs_esc7_ca_manager_password }}"
-    upn: "{{ ludus_adcs_esc7_ca_manager_user }}"
+    upn: "{{ ludus_adcs_esc7_ca_manager_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true
     state: present
@@ -19,7 +19,7 @@
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc7_cert_manager_user }}"
     password: "{{ ludus_adcs_esc7_cert_manager_password }}"
-    upn: "{{ ludus_adcs_esc7_cert_manager_user }}"
+    upn: "{{ ludus_adcs_esc7_cert_manager_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true
     state: present
