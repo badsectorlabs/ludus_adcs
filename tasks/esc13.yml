@@ -6,8 +6,10 @@
 - name: Create an ESC13 domain user
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc13_user }}"
+    identity: "{{ ludus_adcs_esc13_user }}"  # sAMAccountName lookup finds the user in any OU
     password: "{{ ludus_adcs_esc13_password }}"
-    upn: "{{ ludus_adcs_esc13_user }}"
+    update_password: when_changed
+    upn: "{{ ludus_adcs_esc13_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true
     state: present

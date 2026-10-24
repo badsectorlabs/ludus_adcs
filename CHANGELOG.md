@@ -5,6 +5,18 @@ All notable changes to `ludus_adcs` will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0\] - 2026-10-24
+
+### Fixed
+- ESC user tasks now look up existing accounts by `sAMAccountName` (`identity`) instead of only `CN=<name>,CN=Users`. Previously, re-running the role after an ESC user had been moved to another OU failed with `New-ADUser failed: ... UPN value ... not unique forest-wide`.
+- ESC users are created with a full UPN (`<user>@<domain fqdn>`) instead of a bare username, so they no longer collide on the forest-wide UPN uniqueness check with same-named users in other domains (PR #12). On existing ranges, the next run rewrites the UPN in place.
+- The primary DC for the CA's domain is now matched on the exact domain FQDN. Previously, a prefix match on the first label could pick another domain's DC (for example, `ludus` matching `ludus2.domain`). The CA's own range config entry is also matched exactly on `vm_name`.
+
+### Changed
+- ESC user passwords use `update_password: when_changed`, so re-runs report `ok` unless the password has drifted from the configured value.
+- `ludus_adcs_domain_fqdn` now comes from the CA's own range config entry, and `ludus_adcs_domain` is derived from it. Added the `ludus_adcs_vm_config` default.
+- README documents the Ludus-supplied variables, and the variables to set when using the role outside of Ludus. Removed the unused `ludus_adcs_ca_web_enrollment` variable from the example playbook.
+
 ## [1.6.0] - 2026-03-20
 
 ### Added

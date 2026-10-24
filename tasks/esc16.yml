@@ -58,8 +58,10 @@
 - name: "ESC16 - Create ESC16 domain user"
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc16_user }}"
+    identity: "{{ ludus_adcs_esc16_user }}"  # sAMAccountName lookup finds the user in any OU
     password: "{{ ludus_adcs_esc16_password }}"
-    upn: "{{ ludus_adcs_esc16_user }}"
+    update_password: when_changed
+    upn: "{{ ludus_adcs_esc16_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true
     state: present
