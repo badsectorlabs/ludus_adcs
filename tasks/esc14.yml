@@ -164,7 +164,9 @@
 - name: "ESC14 - Create ESC14 attacker user"
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc14_user }}"
+    identity: "{{ ludus_adcs_esc14_user }}"  # sAMAccountName lookup finds the user in any OU
     password: "{{ ludus_adcs_esc14_password }}"
+    update_password: when_changed
     upn: "{{ ludus_adcs_esc14_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true
@@ -178,7 +180,9 @@
 - name: "ESC14 - Create ESC14 target user"
   microsoft.ad.user:
     name: "{{ ludus_adcs_esc14_target_user }}"
+    identity: "{{ ludus_adcs_esc14_target_user }}"  # sAMAccountName lookup finds the user in any OU
     password: "{{ ludus_adcs_esc14_target_password }}"
+    update_password: when_changed
     upn: "{{ ludus_adcs_esc14_target_user }}@{{ ludus_adcs_domain_fqdn }}"
     password_never_expires: true
     user_cannot_change_password: true

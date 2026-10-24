@@ -28,12 +28,20 @@ None.
 
 Available variables are listed below, along with default values (see `defaults/main.yml`):
 
+    # This pulls this machine's entry from the ludus range config (inventory_hostname is the vm_name)
+    ludus_adcs_vm_config: "{{ (ludus | selectattr('vm_name', 'equalto', inventory_hostname))[0] }}"
+    # FQDN of the domain assigned to this machine in the ludus range config
+    ludus_adcs_domain_fqdn: "{{ ludus_adcs_vm_config.domain.fqdn }}"
     # This pulls the netbios_name out of the domain assigned to this machine in the ludus range config
-    ludus_adcs_domain: "{{ (ludus | selectattr('vm_name', 'match', inventory_hostname))[0].domain.fqdn.split('.')[0] }}"
+    ludus_adcs_domain: "{{ ludus_adcs_domain_fqdn.split('.')[0] }}"
+    # This pulls the primary-dc config entry whose domain FQDN exactly matches this machine's domain
+    ludus_adcs_dc_config: "{{ (ludus | selectattr('domain', 'defined') | selectattr('domain.fqdn', 'equalto', ludus_adcs_domain_fqdn) | selectattr('domain.role', 'equalto', 'primary-dc'))[0] }}"
     # This pulls the vm_name of the primary-dc for the domain assigned to this machine in the ludus range config
-    ludus_adcs_dc: "{{ (ludus | selectattr('domain', 'defined') | selectattr('domain.fqdn', 'match', ludus_adcs_domain) | selectattr('domain.role', 'match', 'primary-dc'))[0].hostname }}"
+    ludus_adcs_dc: "{{ ludus_adcs_dc_config.vm_name }}"
+    # DC IP address, used as domain_server for the microsoft.ad modules
+    ludus_adcs_dc_ip: "10.{{ range_second_octet }}.{{ ludus_adcs_dc_config.vlan }}.{{ ludus_adcs_dc_config.ip_last_octet }}"
     # This pulls the hostname from the ludus config for this host
-    ludus_adcs_ca_host: "{{ (ludus | selectattr('vm_name', 'match', inventory_hostname))[0].hostname }}"
+    ludus_adcs_ca_host: "{{ ludus_adcs_vm_config.hostname }}"
     ludus_adcs_domain_username: "{{ ludus_adcs_domain }}\\{{ defaults.ad_domain_admin }}"
     ludus_adcs_domain_password: "{{ defaults.ad_domain_admin_password }}"
     ludus_adcs_ca_common_name: "{{ ludus_adcs_domain }}-CA"
@@ -100,6 +108,24 @@ Available variables are listed below, along with default values (see `defaults/m
         ESC9: "{{ ludus_adcs_esc9_display_name }}"
         ESC13: "{{ ludus_adcs_esc13_display_name }}"
 
+### Using this role outside of Ludus
+
+The defaults above are computed from variables that Ludus supplies to every role: the `ludus` range config, `range_second_octet`, `defaults.ad_domain_admin`, and `defaults.ad_domain_admin_password`. ESC4 also reads the Ludus host variables `ludus_domain_netbios_name` and `ludus_domain_fqdn_tail` directly. Outside of Ludus none of these exist, so set the following variables yourself:
+
+| Variable | Example | Used for |
+|---|---|---|
+| `ludus_adcs_domain` | `mydomain` | NetBIOS domain name (template ACLs, `runas` become) |
+| `ludus_adcs_domain_fqdn` | `mydomain.local` | UPN suffix of the ESC users |
+| `ludus_adcs_dc` | `DC01` | Inventory hostname of the primary DC; target of `delegate_to` for the DC registry changes made by ESC9, ESC10, ESC14, and ESC16, so it must be in your inventory with a working Windows connection |
+| `ludus_adcs_dc_ip` | `10.0.0.10` | `domain_server` used when creating the ESC users and groups |
+| `ludus_adcs_ca_host` | `CAHOST` | Hostname of the CA, shown in task output |
+| `ludus_adcs_domain_username` | `mydomain\Administrator` | Domain admin account used for AD and CA changes |
+| `ludus_adcs_domain_password` | `P@ssw0rd` | Password for `ludus_adcs_domain_username` |
+| `ludus_domain_netbios_name` | `mydomain` | ESC4 only: first `DC=` component of the domain DN |
+| `ludus_domain_fqdn_tail` | `local` | ESC4 only: remaining labels of the domain FQDN (`mydomain.local` → `local`) |
+
+`ludus_adcs_vm_config` and `ludus_adcs_dc_config` are only used to compute the variables above, so you don't need to set them when you set those.
+
 
 ## Dependencies
 
@@ -112,12 +138,18 @@ None.
   roles:
     - badsectorlabs.ludus_adcs
   vars:
+    # Required outside of Ludus (see "Using this role outside of Ludus")
     ludus_adcs_domain: mydomain
+    ludus_adcs_domain_fqdn: mydomain.local
+    ludus_adcs_dc: DC01
+    ludus_adcs_dc_ip: 10.0.0.10
     ludus_adcs_ca_host: CAHOST
     ludus_adcs_domain_username: "mydomain\\Administrator"
     ludus_adcs_domain_password: P@ssw0rd
+    ludus_domain_netbios_name: mydomain
+    ludus_domain_fqdn_tail: local
+    # Optional
     ludus_adcs_ca_common_name: mydomain-CA
-    ludus_adcs_ca_web_enrollment: true
     ludus_adcs_esc1: true
     ludus_adcs_esc2: true
     ludus_adcs_esc3: true
